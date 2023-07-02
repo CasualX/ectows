@@ -1,0 +1,16 @@
+[package]
+name = "ectows"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+fmtools = { version = "0.1", features = ["obfstr"] }
+obfstr = "0.4"
+cvar = "0.4"
+serde = "1.0"
+serde_json = "1.0"
+
+[dependencies.websock]
+git = "https://github.com/CasualX/websocket-protocol"
+features = ["std"]
+branch = "wip"
