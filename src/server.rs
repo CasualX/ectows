@@ -10,6 +10,7 @@ pub struct Server {
 	connections: Vec<Connection>,
 	count: usize,
 	tokens: Tokens,
+	settingsui: String,
 	logs: Vec<String>,
 }
 
@@ -25,6 +26,7 @@ impl Server {
 			connections: Vec::new(),
 			count: 0,
 			tokens: Tokens::default(),
+			settingsui: String::new(),
 			logs: Vec::new(),
 		})
 	}
@@ -65,8 +67,29 @@ impl Server {
 		self.accept();
 		let logs = &self.logs;
 		let tokens = &self.tokens;
+		let settingsui = &self.settingsui;
+
 		self.connections.retain_mut(move |conn| {
 			conn.tick(tokens, logs, tree);
+
+			if settingsui.len() > 0 {
+				match &mut conn.cl {
+					Some(TheClient::Admin(admin)) if !admin.has_ui => {
+						admin.has_ui = true;
+
+						let text = Message {
+							message: settingsui.as_str(),
+							target: obfstr!("settings/ui"),
+						}.to_string();
+
+						if let Some(tx) = conn.ws.transmit() {
+							tx.send_text(&text, true);
+						}
+					}
+					_ => (),
+				}
+			}
+
 			!conn.closing
 		});
 	}
@@ -86,6 +109,19 @@ impl Server {
 				if let Some(TheClient::Admin(_)) = conn.cl {
 					tx.send_text(&text, true);
 				}
+			}
+		}
+	}
+
+	/// Publishes the settings UI to all connected admin clients.
+	pub fn settingsui(&mut self, ui: &str) {
+		self.settingsui.clear();
+		self.settingsui.push_str(ui);
+
+		// Clear the has_ui flag so that the UI is resent
+		for conn in self.connections.iter_mut() {
+			if let Some(TheClient::Admin(admin)) = &mut conn.cl {
+				admin.has_ui = false;
 			}
 		}
 	}

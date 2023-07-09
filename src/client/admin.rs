@@ -6,6 +6,7 @@ const MAX_LOG_LINES: usize = 1000;
 #[derive(Default)]
 pub struct AdminClient {
 	log_index: usize,
+	pub(crate) has_ui: bool,
 }
 
 impl AdminClient {

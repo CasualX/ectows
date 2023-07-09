@@ -144,7 +144,7 @@ impl<'a> websock::Handler for ConnHandler<'a> {
 
 	fn message(&mut self, ws: &mut websock::WebSocketTx, msg: websock::Msg<'_>) {
 		match msg {
-			websock::Msg::Text(text) => {
+			websock::Msg::Text(mut text) => {
 				let tree = match self.cl {
 					Some(TheClient::Web(web)) => {
 						web as &mut dyn cvar::IVisit
@@ -155,13 +155,31 @@ impl<'a> websock::Handler for ConnHandler<'a> {
 					None => return,
 				};
 
-				let mut response = String::new();
-				let (path, args) = split_line(text);
-				cvar::console::poke(tree, path, args, &mut response);
+				let quiet = text.starts_with(obfstr!("@"));
+				if quiet {
+					text = &text[1..];
+				}
 
-				// Reply with the log if any was written
-				if response.len() > 0 {
-					send(ws, obfstr!("console/log"), &response);
+				let mut response = String::new();
+				if text == obfstr!("settings!") {
+					cvar::console::walk(tree, |name, node| {
+						if let cvar::Node::Prop(prop) = node.as_node() {
+							let value = prop.get_value();
+							use std::fmt::Write;
+							_ = fmtools::write!(&mut response, {name}"="{value}"\n");
+						}
+					});
+
+					send(ws, obfstr!("settings/cvars"), &response);
+				}
+				else {
+					let (path, args) = split_line(text);
+					let success = cvar::console::poke(tree, path, args, &mut response);
+
+					// Reply with the log if any was written
+					if (!quiet || !success) && response.len() > 0 {
+						send(ws, obfstr!("console/log"), &response);
+					}
 				}
 			},
 			websock::Msg::Binary(_) => (),
